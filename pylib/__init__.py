@@ -1,76 +1,78 @@
-""" Example pylib functions"""
+import rasterio
+import rasterio.mask
+from joblib import Parallel, delayed
+from tqdm.notebook import tqdm
+import numpy as np 
+import pandas as pd
+import h5py
+
+# Load a year of rasters, masked and cropped to a geometry
+# See the rasterio documentation for more examples: 
+# https://rasterio.readthedocs.io/en/latest/topics/masking-by-shapefile.html
+def load_ntl(pkg, year, shapes=None):
+    
+    ref = pkg.reference(f'ntl{year}').resolved_url.get_resource().get_target()
+    
+    with rasterio.open(str(ref.fspath)) as src:
+        
+        if shapes is not None:
+            img, transform = rasterio.mask.mask(src, shapes, crop=True)
+        else:
+            img =  src.read()
+            transform = None
+            
+        meta = src.meta
+      
+
+        return img, meta, transform
+    
+def mp_ntl_mask(ntl_p, df, col='geometry', desc = ''):
+    """Run a multi-process masking operation to return numpy arrays extracted from the 
+    NTL datasets in the ntl_p packages according to each of the geometries in the df GeoDataFrame, using the 
+    geometry column col """
+    tasks = [  (year, r.unique_id, r[col]) for idx,r in df.iterrows() for year in list(range(1992, 2018+1))]
+
+    # Run the extraction tasks in parallel
+    # First, define the function we will run in parallel
+    def _f(year, sez_id, geo):
+        try:
+            return (year, sez_id, load_ntl(ntl_p, year, [geo])[0])
+        except Exception as e:
+            return (year, sez_id, e)
+
+    # Second, run the tasks
+    patches = Parallel(prefer='threads')(delayed(_f)(*t) for t in tqdm(tasks, desc=col+' '+desc))
+
+    exc = [(year, sez_id,  e) for year, sez_id,  e in patches if isinstance(e, Exception)]
+
+    return patches, exc, tasks
 
 
-def row_generator(resource, doc, env, *args, **kwargs):
-    """ An example row generator function.
+def make_rings(df, r1, r2=None):
+    """Return geometries for rings around the points ( or other geometry ) in df. If not specified, 
+    r2 is selected so the area of the ring is equal to the area of the circle described by r1, 
+    r2 = sqrt(2)*r1"""
 
-    Reference this function in a Metatab file as the value of a Datafile:
+    if r2 is None:
+        r2 = np.sqrt(2)*r1
+    
+    buf_r1 = df.to_crs(3395).buffer(r1)
+    buf_r2 = df.to_crs(3395).buffer(r2)
 
-            Datafile: python:pylib#row_generator
+    # Check that relative difference is close to zero --> areas are equal
+    # rel_diff = ((sez_buf_r1.area - sez_buf_r2.difference(sez_buf_r1).area)/sez_buf_r1.area).round(8)
+    # assert rel_diff.sum() == 0
 
-    The function must yield rows, with the first being headers, and subsequenct rows being data.
+    return buf_r2.difference(buf_r1)
 
-    :param resource: The Datafile term being processed
-    :param doc: The Metatab document that contains the term being processed
-    :param args: Positional arguments passed to the generator
-    :param kwargs: Keyword arguments passed to the generator
-    :return:
+def build_ring_sums(ntl_p, sez_df, radius=10_000):
+    
+    sez_rings = make_rings(sez_df, radius)
 
+    sez_df = sez_df.join(sez_rings.to_crs(4326).to_frame('ring'))
 
-    The env argument is a dict with these environmental keys:
+    patches, exc, tasks = mp_ntl_mask(ntl_p, sez_df.to_crs(4326), 'ring', desc=f'ring {radius}')
 
-    * CACHE_DIR
-    * RESOURCE_NAME
-    * RESOLVED_URL
-    * WORKING_DIR
-    * METATAB_DOC
-    * METATAB_WORKING_DIR
-    * METATAB_PACKAGE
+    rows = [ (e[0],e[1], np.nansum(e[2]), np.count_nonzero(~np.isnan(e[2])), a) for e, a in zip(patches, sez_rings.area) ]
 
-    It also contains key/value pairs for all of the properties of the resource.
-
-    """
-
-    yield 'a b c'.split()
-
-    for i in range(10):
-        yield [i, i * 2, i * 3]
-
-
-def example_transform(v, row, row_n, i_s, i_d, header_s, header_d, scratch, errors, accumulator):
-    """ An example column transform.
-
-    This is an example of a column transform with all of the arguments listed. An real transform
-    can omit any ( or all ) of these, and can supply them in any order; the calling code will inspect the
-    signature.
-
-    When the function is listed as a transform for a column, it is called for every row of data.
-
-    :param v: The current value of the column
-    :param row: A RowProxy object for the whiole row.
-    :param row_n: The current row number.
-    :param i_s: The numeric index of the source column
-    :param i_d: The numeric index for the destination column
-    :param header_s: The name of the source column
-    :param header_d: The name of the destination column
-    :param scratch: A dict that can be used for storing any values. Persists between rows.
-    :param errors: A dict used to store error messages. Persists for all columns in a row, but not between rows.
-    :param accumulator: A dict for use in accumulating values, such as computing aggregates.
-    :return: The final value to be supplied for the column.
-    """
-
-    return str(v) + '-foo'
-
-
-def custom_update(doc, args):
-    """Custom update function, run with `mp update -U`
-
-    The args argument will recieve any remainder arguments from the call, for instance
-
-        mp update -U -- --foo bar
-
-    """
-
-    doc.reference('source')
-
-    doc.write()
+    return sez_df, patches, exc, pd.DataFrame(rows, columns=['year','sez_id','ring_pix_sum', 'ring_pix_count', 'ring_area'])

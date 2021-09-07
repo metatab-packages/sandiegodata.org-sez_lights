@@ -1,5 +1,5 @@
 Declare,metatab-latest
-Title,
+Title,"SEZ Lights, Rings and Buffers"
 Description,
 Identifier,24f165cc-e923-4278-ab2a-4c10374d1303
 Name,sandiegodata.org-sez_lights-1.1.1
@@ -16,15 +16,16 @@ Version.Patch,1
 Created,2021-09-06T18:06:16
 Modified,2021-09-06T18:06:46
 Giturl,https://github.com/metatab-packages/sandiegodata.org-sez_lights.git
-""
+
 Section,Contacts,Email,Organization,Url
 Wrangler,Eric Busboom,eric@civicknowledge.com,Civic Knowledge,http://civicknowledge.com
-""
+
 Section,Documentation,Title,Description,
 Documentation,file:README.md,README,,
-""
+
 Section,References,Name,Description,
-""
+Reference,metapack+http://library.metatab.org/worldbank.org-sez-1.1.1.csv#sez,sez,SEZ Locations and data
+Reference,metapack+http://library.metatab.org/figshare.com-harmonized_ntl-1.1.1.csv,ntl,Harmonized Nighttime lights
 Section,Resources,Name,Description,
-""
+
 Section,Schema,DataType,AltName,Description
