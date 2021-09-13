@@ -59,20 +59,28 @@ def make_rings(df, r1, r2=None):
     buf_r1 = df.to_crs(3395).buffer(r1)
     buf_r2 = df.to_crs(3395).buffer(r2)
 
+    ring = buf_r2.difference(buf_r1)
+    
     # Check that relative difference is close to zero --> areas are equal
-    # rel_diff = ((sez_buf_r1.area - sez_buf_r2.difference(sez_buf_r1).area)/sez_buf_r1.area).round(8)
-    # assert rel_diff.sum() == 0
+    rel_diff = ((buf_r1.area - ring.area)/buf_r1.area).round(8)
+    #print('!!!!',rel_diff.sum(), r1, r2, buf_r1.area, ring.area)
+    assert rel_diff.sum() == 0, (r1, r2, rel_diff.sum())
+    
+    return ring
 
-    return buf_r2.difference(buf_r1)
-
-def build_ring_sums(ntl_p, sez_df, radius=10_000):
+def build_ring_sums(ntl_p, sez_df, radius):
+    import geopandas as gpd 
     
     sez_rings = make_rings(sez_df, radius)
 
-    sez_df = sez_df.join(sez_rings.to_crs(4326).to_frame('ring'))
+    sr = gpd.GeoDataFrame(sez_rings.to_frame('ring'), geometry='ring')
+    sr['ring_area'] = sez_rings.area
+    
+    sez_df = sez_df.join(sr.to_crs(4326))
 
     patches, exc, tasks = mp_ntl_mask(ntl_p, sez_df.to_crs(4326), 'ring', desc=f'ring {radius}')
 
-    rows = [ (e[0],e[1], np.nansum(e[2]), np.count_nonzero(~np.isnan(e[2])), a) for e, a in zip(patches, sez_rings.area) ]
+    rows = [ (e[0],e[1], np.nansum(e[2]), np.count_nonzero(~np.isnan(e[2]))) for e in patches ]
 
-    return sez_df, patches, exc, pd.DataFrame(rows, columns=['year','sez_id','ring_pix_sum', 'ring_pix_count', 'ring_area'])
+    return (sez_df, patches, exc,
+            pd.DataFrame(rows, columns=['year','unique_id','ring_pix_sum', 'ring_pix_count']) )

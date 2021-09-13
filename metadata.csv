@@ -1,31 +1,48 @@
 Declare,metatab-latest
 Title,"SEZ Lights, Rings and Buffers"
-Description,
+Description,"Sums of pixel values representing nighttime light intensit, for buffers and"
+Description,rings around Special Economic Zones.
 Identifier,24f165cc-e923-4278-ab2a-4c10374d1303
-Name,sandiegodata.org-sez_lights-1.1.1
+Name,sandiegodata.org-sez_lights-1.1.2
 Dataset,sez_lights
 Origin,sandiegodata.org
 Time,
 Space,
 Grain,
 Variant,
-Version,1.1.1
+Version,1.1.2
 Version.Major,1
 Version.Minor,1
-Version.Patch,1
+Version.Patch,2
+Group,sez
+Tag,sez
+Tag,special_economic_zones
 Created,2021-09-06T18:06:16
-Modified,2021-09-06T18:06:46
+Modified,2021-09-13T19:23:45
 Giturl,https://github.com/metatab-packages/sandiegodata.org-sez_lights.git
-
+""
 Section,Contacts,Email,Organization,Url
 Wrangler,Eric Busboom,eric@civicknowledge.com,Civic Knowledge,http://civicknowledge.com
-
+""
 Section,Documentation,Title,Description,
 Documentation,file:README.md,README,,
-
+Image,doc/ring_raster.png,Rings & Rasters,Example of a 5km buffer and the ring around it.,
+""
 Section,References,Name,Description,
-Reference,metapack+http://library.metatab.org/worldbank.org-sez-1.1.1.csv#sez,sez,SEZ Locations and data
-Reference,metapack+http://library.metatab.org/figshare.com-harmonized_ntl-1.1.1.csv,ntl,Harmonized Nighttime lights
+Reference,metapack+http://library.metatab.org/worldbank.org-sez-1.1.1.csv#sez,sez,SEZ Locations and data,
+Reference,metapack+http://library.metatab.org/figshare.com-harmonized_ntl-1.1.1.csv,ntl,Harmonized Nighttime lights,
+""
 Section,Resources,Name,Description,
-
-Section,Schema,DataType,AltName,Description
+Datafile,data/mean_lights.csv,mean_lights,Pixel light sums for buffers and rings around the SEZ.,
+""
+Section,Schema,DataType,Description,Has_Codes
+Table,mean_lights,,,
+Table.Column,year,integer,Year of night time lights data,
+Table.Column,unique_id,string,Unique id for the SEZ,
+Table.Column,buffer_pix_sum,integer,Sum of the pixel values for pixels within radius of SEZ point,
+Table.Column,buffer_pix_count,integer,Number of non-null pixels in buffer region,
+Table.Column,ring_pix_sum,integer,"Sum of pixel values in ring area, outsize of buffer area. Area of ring is equal to area of the buffer.",
+Table.Column,ring_pix_count,integer,Number of non-null pixels in ring region,
+Table.Column,buffer_area,number,Area of buffer area in square meters,
+Table.Column,ring_area,number,Area of ring area in square meters,
+Table.Column,radius,integer,"Radius of buffer circle, and inner radius of ring.",
